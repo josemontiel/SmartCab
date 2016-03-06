@@ -1,6 +1,7 @@
-# Train a Smartcab How to Drive
 
-Reinforcement Learning Project
+# SmartCab
+Reinforcement Learning project for training a SmartCab to drive itself using a Q - Learning Algorithm
+
 
 ## Install
 
