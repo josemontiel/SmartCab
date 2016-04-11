@@ -7,7 +7,7 @@ from collections import namedtuple
 class LearningAgent(Agent):
     """An agent that learns to drive in the smartcab world."""
 
-    AState = namedtuple('AState', ['next_waypoint', 'light', 'deadline'])
+    AState = namedtuple('AState', ['next_waypoint', 'light', 'green_oncoming_is_forward', 'red_left_is_forward'])
 
     def __init__(self, env):
         super(LearningAgent, self).__init__(env)  # sets self.env = env, state = None, next_waypoint = None, and a default color
@@ -28,7 +28,8 @@ class LearningAgent(Agent):
         inputs = self.env.sense(self)
         deadline = self.env.get_deadline(self)
 
-        present_state = self.AState(next_waypoint=self.next_waypoint, light=inputs['light'],  deadline=deadline)
+        light_ = inputs['light']
+        present_state = self.AState(next_waypoint=self.next_waypoint, light=light_, green_oncoming_is_forward=(light_ == 'green' and inputs['oncoming'] == 'forward'), red_left_is_forward=(light_ == 'red' and inputs['left'] == 'forward'))
         self.state = present_state
         old_q, action = self.choose_action(present_state)
         self.last_action = action
@@ -38,15 +39,15 @@ class LearningAgent(Agent):
 
         # Sense new state
         new_inputs = self.env.sense(self)
-        new_state = self.AState(next_waypoint=self.next_waypoint, light=new_inputs['light'],  deadline=deadline)
+        new_state = self.AState(next_waypoint=self.next_waypoint, light=new_inputs['light'] , green_oncoming_is_forward=(new_inputs['light'] == 'green' and new_inputs['oncoming'] == 'forward'), red_left_is_forward=(new_inputs['light'] == 'red' and new_inputs['left'] == 'forward'))
         new_Q = self.learned_val(reward, new_state, old_q)
         self.Q_values[(present_state, action)] = new_Q
 
         # print "LearningAgent.update(): deadline = {}, inputs = {}, action = {}, reward = {}, oldQ = {}, newQ = {},".format(deadline, inputs, action, reward, old_q, new_Q)  # [debug]
 
     def learned_val(self, reward, new_state, old_q):
-        learning_rate = 0.6
-        discount_factor = 0.25
+        learning_rate = 0.25
+        discount_factor = 0.6
 
         new_q = old_q + (learning_rate * (reward + (discount_factor * self.maxQ(new_state) - old_q)))
 
@@ -59,6 +60,7 @@ class LearningAgent(Agent):
         return maxQ
 
     def choose_action(self, state, valid_actions=Environment.valid_actions):
+        next_way_action_q = self.getQ(state, state.next_waypoint);
         q = [self.getQ(state, a) for a in valid_actions]
         maxQ = max(q)
 
@@ -68,9 +70,16 @@ class LearningAgent(Agent):
         else:
             i = q.index(maxQ)
 
-        action = Environment.valid_actions[i]
+        action = None
+        finalQ = 0
+        if next_way_action_q < maxQ:
+            action = state.next_waypoint
+            finalQ = next_way_action_q
+        else:
+            action = Environment.valid_actions[i]
+            finalQ = maxQ
 
-        return maxQ, action
+        return finalQ, action
 
     def getQ(self, state, a):
         return self.Q_values.get((state, a), 1)
@@ -78,7 +87,7 @@ class LearningAgent(Agent):
 class TrainedAgent(Agent):
     """An agent that learns to drive in the smartcab world."""
 
-    LearningAgentState = namedtuple('LearningAgentState', ['next_waypoint', 'light',  'deadline'])
+    AState = namedtuple('AState', ['next_waypoint', 'light', 'green_oncoming_is_forward', 'red_left_is_forward'])
 
     def __init__(self, env, policy):
         super(TrainedAgent, self).__init__(env)  # sets self.env = env, state = None, next_waypoint = None, and a default color
@@ -107,8 +116,7 @@ class TrainedAgent(Agent):
         inputs = self.env.sense(self)
         deadline = self.env.get_deadline(self)
 
-
-        S = self.LearningAgentState(next_waypoint=self.next_waypoint, light=inputs['light'], deadline=deadline)
+        S = self.AState(next_waypoint=self.next_waypoint, light=inputs['light'] , green_oncoming_is_forward=(inputs['light'] == 'green' and inputs['oncoming'] == 'forward'), red_left_is_forward=(inputs['light'] == 'red' and inputs['left'] == 'forward'))
 
         self.state = S
 
